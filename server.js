@@ -98,12 +98,12 @@ app.post('/upload', function(req, res) {
     if (err)
       return res.json(createBadResponse(err));
 
-    var extractedFolder = tempDir + mapFile.name.substring(0, mapFile.name.length - 4);
-    var unzipResult = spawnSync('unzip', ['-o', '-d', extractedFolder, zipPath]);
+    var extractedFolderPath = tempDir + mapFile.name.substring(0, mapFile.name.length - 4);
+    var unzipResult = spawnSync('unzip', ['-o', '-d', extractedFolderPath, zipPath]);
     if (unzipResult.status == 0) {
-      var mapDirectory = spawnSync('find', [extractedFolder, '-iname', 'level.dat'], {encoding: 'utf-8'}).stdout.trimRight();
+      var mapDirectory = spawnSync('find', [extractedFolderPath, '-iname', 'level.dat'], {encoding: 'utf-8'}).stdout.trimRight();
       if (mapDirectory.length > 0) {
-        // Remove 'level.dat' from end of directory
+        // Remove 'level.dat' from end of path
         mapDirectory = mapDirectory.substring(0, mapDirectory.length - 9);
 
         // Remove old world dir from given version's directory
@@ -112,11 +112,19 @@ app.post('/upload', function(req, res) {
         // Launch server for version
         startServer(version);
       }
+
+      // Clean up extracted folder
+      spawnSync('rm', ['-rf', extractedFolderPath]);
     }
+
+    // Clean up files/folders
+    spawnSync('rm', ['-rf', zipPath]);
 
     if (isServerUp()) {
       console.log(`Server launched!\tVersion: ${version}\tMap name: ${mapFile.name}`)
       res.json(createGoodResponse());
+    } else {
+      res.json(createBadResponse("Server failed to start. Check the log."));
     }
   });
 });
