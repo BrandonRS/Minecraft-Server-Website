@@ -58,8 +58,7 @@ function startServer(version) {
   var args = serverArgs.map(x => x);
   args.push(serverPath, 'nogui');
 
-  mcserver = spawn('java', args, { cwd: versionDir, stdio: ['pipe', 'inherit', 'ignore'] });
-  console.log(mcserver);
+  mcserver = spawn('java', args, { cwd: versionDir, stdio: ['pipe', 'ignore', 'ignore'] });
 }
 
 function stopServer() {
@@ -82,7 +81,7 @@ app.set('view engine', 'pug');
 
 app.post('/upload', function(req, res) {
   if (!req.files || Object.keys(req.files).length === 0) {
-    return res.status(400).send('No files were uploaded.');
+    return res.json(createBadResponse('No files were uploaded.'));
   }
 
   // The name of the input field (i.e. "sampleFile") is used to retrieve the uploaded file
@@ -92,12 +91,12 @@ app.post('/upload', function(req, res) {
 
   // Verify version is valid
   if (!servers.includes(version))
-    res.status(400).send(`Version ${version} is not valid.`);
+    res.json(createBadResponse(`Version ${version} is not valid.`));
 
   // move mapFile to temp directory
   mapFile.mv(zipPath, function(err) {
     if (err)
-      return res.status(500).send(err);
+      return res.json(createBadResponse(err));
 
     var extractedFolder = tempDir + mapFile.name.substring(0, mapFile.name.length - 4);
     var unzipResult = spawnSync('unzip', ['-o', '-d', extractedFolder, zipPath]);
@@ -115,8 +114,10 @@ app.post('/upload', function(req, res) {
       }
     }
 
-
-    res.send(`Server started!`);
+    if (isServerUp()) {
+      console.log(`Server launched!\tVersion: ${version}\tMap name: ${mapFile.name}`)
+      res.json(createGoodResponse());
+    }
   });
 });
 
