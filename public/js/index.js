@@ -18,11 +18,19 @@ $("#submit").click(function() {
 });
 
 function showSuccess(text) {
-    new Noty({ type: 'success', text: text }).show();
+    new Noty({
+        type: 'success',
+        timeout: 4000,
+        text: text
+    }).show();
 }
 
 function showError(text) {
-    new Noty({ type: 'error', text: text }).show();
+    new Noty({
+        type: 'error',
+        timeout: 4000,
+        text: text
+    }).show();
 }
 
 $("#startServer").click(function() {
