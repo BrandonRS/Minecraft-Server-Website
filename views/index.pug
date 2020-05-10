@@ -25,21 +25,21 @@ html(lang="en")
                     h2#currentMapName
                     h2#currentVersion
 
-    form.container(action='/upload' method='POST' enctype="multipart/form-data")
+    form#startServerForm.container(action='/upload' method='POST' enctype="multipart/form-data")
         .row
             .col-4
                 label(for="version") Select Version
                 select#version.form-control(name="version")
                         - for (var i = servers.length - 1; i >= 0; i--)
                             option(value=servers[i]) #{servers[i]}
-            .col-4.file-upload-wrapper
+            .col-4
                 label(for='mapUpload') Upload Map
-                input#mapUpload(name='mapUpload' type="file" accept=".zip")
+                input#mapUpload.form-control-file(required type='file' name='mapUpload' accept='.zip')
             .col-4
                 h3 Edit Server Properties
         .row
             .col
-                button#submit(type="submit") Submit
+                input#submit(type="submit" value='Submit')
 
 
     // Scripts

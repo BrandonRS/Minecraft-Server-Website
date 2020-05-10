@@ -2,7 +2,7 @@ const GOOD = 200, BAD = 400;
 
 $(function() {
     $("form").ajaxForm(function(res) {
-        $("#submit").prop('disabled', false);
+        $("#startServerForm").find("input").prop('disabled', false);
         if (res.status == GOOD) {
             showSuccess("Server successfully started!");
             getServerStatus();
@@ -14,7 +14,7 @@ $(function() {
 });
 
 $("#submit").click(function() {
-    $("#submit").prop('disabled', true);
+    //$("#startServerForm").find("input").prop('disabled', true);
 });
 
 function showSuccess(text) {
@@ -34,10 +34,10 @@ function showError(text) {
 }
 
 $("#startServer").click(function() {
-    $("#serverControl").children().prop("disabled", true);
+    $("#serverControl").find().prop("disabled", true);
     $.post("/start")
     .done(function(res) {
-        $("#serverControl").children().prop("disabled", false);
+        $("#serverControl").find().prop("disabled", false);
         if (res.status == GOOD) {
             showSuccess("Server successfully started!");
             $("#statusText").text("Server is up!");
@@ -48,10 +48,10 @@ $("#startServer").click(function() {
 });
 
 $("#stopServer").click(function() {
-    $("#serverControl").children().prop("disabled", true);
+    $("#serverControl").find().prop("disabled", true);
     $.post("/stop")
     .done(function(res) {
-        $("#serverControl").children().prop("disabled", false);
+        $("#serverControl").find().prop("disabled", false);
         if (res.status == GOOD) {
             showSuccess("Server successfully stopped!");
             $("#statusText").text("Server is down!");
@@ -62,10 +62,10 @@ $("#stopServer").click(function() {
 });
 
 function getServerStatus() {
-    $("#serverControl").children().prop("disabled", true);
+    $("#serverControl").find().prop("disabled", true);
     $.get('/status')
     .done(function(res) {
-        $("#serverControl").children().prop("disabled", false);
+        $("#serverControl").find().prop("disabled", false);
         if (res.status == GOOD) {
             $("#statusText").text("Server is " + res.result + "!");
         }
