@@ -26,6 +26,7 @@ html(lang="en")
                     h2#currentVersion
 
     form#startServerForm.container(action='/upload' method='POST' enctype="multipart/form-data")
+        input#inputProp(type='hidden' name='properties')
         .row
             .col-4
                 label(for="version") Select Version

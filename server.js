@@ -113,6 +113,10 @@ app.post('/upload', function(req, res) {
         // Remove old world dir from given version's directory
         replaceMapForVersion(version, mapDirectory);
 
+        // Set properties for version
+        var propertiesPath = config.serverDir + `${version}/server.properties`;
+        fs.writeFileSync(propertiesPath, propParser.stringify(JSON.parse(req.body.properties)));
+
         // Launch server for version
         startServer(version);
       }
