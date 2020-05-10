@@ -35,6 +35,8 @@ html(lang="en")
             .col-4
                 label(for='mapUpload') Upload Map
                 input#mapUpload.form-control-file(required type='file' name='mapUpload' accept='.zip')
+                .progress
+                    #uploadProgress.progress-bar(role='progressbar')
             .col-4
                 h3 Edit Server Properties
         .row

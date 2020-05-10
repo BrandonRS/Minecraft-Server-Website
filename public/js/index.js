@@ -1,20 +1,27 @@
 const GOOD = 200, BAD = 400;
 
 $(function() {
-    $("form").ajaxForm(function(res) {
-        $("#startServerForm").find("input").prop('disabled', false);
-        if (res.status == GOOD) {
-            showSuccess("Server successfully started!");
-            getServerStatus();
-        } else {
-            showError("Failed to start server: " + res.message);
+    $("form").ajaxForm({
+        beforeSend: function() {
+            $("#startServerForm").find("input").prop('disabled', true);
+            $("#uploadProgress").css('width', '0%');
+            $('#uploadProgress').text('0%');
+        },
+        uploadProgress: function(e, position, total, complete) {
+            $("#uploadProgress").css('width', complete + '%');
+            $('#uploadProgress').text(complete + "%");
+        },
+        success: function(res) {
+            $("#startServerForm").find("input").prop('disabled', false);
+            if (res.status == GOOD) {
+                showSuccess("Server successfully started!");
+                getServerStatus();
+            } else {
+                showError("Failed to start server: " + res.message);
+            }
         }
     });
     getServerStatus();
-});
-
-$("#submit").click(function() {
-    //$("#startServerForm").find("input").prop('disabled', true);
 });
 
 function showSuccess(text) {

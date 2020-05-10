@@ -61,8 +61,12 @@ function startServer(version) {
   mcserver = spawn('java', args, { cwd: versionDir, stdio: ['pipe', 'ignore', 'ignore'] });
 }
 
-function stopServer() {
-  mcserver.kill();
+function stopServer(callback) {
+  if (isServerUp()) {
+    if (callback != null)
+      mcserver.on('close', callback);
+    mcserver.kill();
+  }
 }
 
 function renderWebpage(res) {
@@ -131,8 +135,9 @@ app.post('/upload', function(req, res) {
 
 app.post('/stop', function(req, res) {
   if (isServerUp()) {
-    stopServer();
-    res.json(createGoodResponse());
+    stopServer(function() {
+      res.json(createGoodResponse());
+    });
   }
   else
     res.json(createBadResponse("Server is not up"));
