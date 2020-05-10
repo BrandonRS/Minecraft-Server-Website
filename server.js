@@ -1,12 +1,9 @@
-const { readdirSync } = require('fs')
 const express = require('express');
 const fileUpload = require('express-fileupload');
 const bodyParser = require('body-parser');
+const conf = require('./config');
+const { readdirSync } = require('fs');
 const { spawn, spawnSync } = require('child_process');
-
-const serverDir = '/var/minecraft/';
-const tempDir = '/tmp/';
-const serverArgs = ['-Xms1G', '-Xmx4G', '-jar'];
 
 var mcserver;
 
@@ -17,10 +14,10 @@ const getDirectories = source =>
 const app = express();
 
 // Get list of servers
-var servers = getDirectories(serverDir);
+var servers = getDirectories(conf.serverDir);
 
 function replaceMapForVersion(version, newMapDir) {
-  var worldDir = serverDir + version + '/' + 'world/';
+  var worldDir = conf.serverDir + version + '/' + 'world/';
   var result = spawnSync('rm', ['-rf', worldDir]);
   if (result.status == 0) {
     spawnSync('cp', ['-r', newMapDir, worldDir]);
@@ -52,11 +49,11 @@ function startServer() {
 }
 
 function startServer(version) {
-  var versionDir = serverDir + version + '/';
+  var versionDir = conf.serverDir + version + '/';
   var serverPath = versionDir + 'server.jar';
 
-  var args = serverArgs.map(x => x);
-  args.push(serverPath, 'nogui');
+  var args = conf.serverArgs.map(x => x);
+  args.push('-jar', serverPath, 'nogui');
 
   mcserver = spawn('java', args, { cwd: versionDir, stdio: ['pipe', 'ignore', 'ignore'] });
 }
@@ -73,7 +70,7 @@ function renderWebpage(res) {
   res.render('index', { message: isServerUp() ? "up!" : "down!", servers: servers });
 }
 
-// default options
+// Add capabilities to app
 app.use(fileUpload());
 app.use(bodyParser.urlencoded({
   extended: true
@@ -87,11 +84,13 @@ app.post('/upload', function(req, res) {
   if (!req.files || Object.keys(req.files).length === 0) {
     return res.json(createBadResponse('No files were uploaded.'));
   }
+  else if (isServerUp())
+    return res.json(createBadResponse("Server currently running."));
 
   // The name of the input field (i.e. "sampleFile") is used to retrieve the uploaded file
   let mapFile = req.files.mapUpload;
   let version = req.body.version;
-  let zipPath = tempDir + mapFile.name;
+  let zipPath = conf.tempDir + mapFile.name;
 
   // Verify version is valid
   if (!servers.includes(version))
@@ -102,7 +101,7 @@ app.post('/upload', function(req, res) {
     if (err)
       return res.json(createBadResponse(err));
 
-    var extractedFolderPath = tempDir + mapFile.name.substring(0, mapFile.name.length - 4);
+    var extractedFolderPath = conf.tempDir + mapFile.name.substring(0, mapFile.name.length - 4);
     var unzipResult = spawnSync('unzip', ['-o', '-d', extractedFolderPath, zipPath]);
     if (unzipResult.status == 0) {
       var mapDirectory = spawnSync('find', [extractedFolderPath, '-iname', 'level.dat'], {encoding: 'utf-8'}).stdout.trimRight();
