@@ -22,6 +22,7 @@ $(function() {
         }
     });
     getServerStatus();
+    getProperties('1.15.2');
 });
 
 function showSuccess(text) {
@@ -76,6 +77,23 @@ function getServerStatus() {
         if (res.status == GOOD) {
             $("#statusText").text("Server is " + res.result + "!");
         }
+    });
+}
+
+function getProperties(version) {
+    $.get('/properties', {'version': version})
+    .done(function(res) {
+        if (res.status == GOOD) {
+            showSuccess("Successfully grabbed properties");
+            Object.keys(res.properties).forEach(k => {
+                var row = $('<tr>');
+                row.append($('<th>').text(k));
+                row.append($('<td>').text(res.properties[k] == null ? 'null' : res.properties[k]));
+                $('#tableProp').append(row);
+            });
+        }
+        else
+            showError("Failed to grab properties: " + res.message);
     });
 }
 

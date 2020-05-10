@@ -12,6 +12,7 @@
     "body-parser": "^1.19.0",
     "express": "^4.17.1",
     "express-fileupload": "^1.1.7-alpha.3",
+    "minecraft-server-properties": "0.0.0",
     "noty": "^3.2.0-beta",
     "pug": "^2.0.4",
     "socket.io": "^2.3.0"

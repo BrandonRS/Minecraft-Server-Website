@@ -1,23 +1,24 @@
 const express = require('express');
 const fileUpload = require('express-fileupload');
 const bodyParser = require('body-parser');
-const conf = require('./config');
-const { readdirSync } = require('fs');
+const propParser = require('minecraft-server-properties');
+const config = require('./config');
+const fs = require('fs');
 const { spawn, spawnSync } = require('child_process');
 
 var mcserver;
 
 const getDirectories = source =>
-  readdirSync(source, { withFileTypes: true }).filter(
+  fs.readdirSync(source, { withFileTypes: true }).filter(
     dirent => dirent.isDirectory()).map(dirent => dirent.name);
 
 const app = express();
 
 // Get list of servers
-var servers = getDirectories(conf.serverDir);
+var servers = getDirectories(config.serverDir);
 
 function replaceMapForVersion(version, newMapDir) {
-  var worldDir = conf.serverDir + version + '/' + 'world/';
+  var worldDir = config.serverDir + version + '/' + 'world/';
   var result = spawnSync('rm', ['-rf', worldDir]);
   if (result.status == 0) {
     spawnSync('cp', ['-r', newMapDir, worldDir]);
@@ -49,10 +50,10 @@ function startServer() {
 }
 
 function startServer(version) {
-  var versionDir = conf.serverDir + version + '/';
+  var versionDir = config.serverDir + version + '/';
   var serverPath = versionDir + 'server.jar';
 
-  var args = conf.serverArgs.map(x => x);
+  var args = config.serverArgs.map(x => x);
   args.push('-jar', serverPath, 'nogui');
 
   mcserver = spawn('java', args, { cwd: versionDir, stdio: ['pipe', 'ignore', 'ignore'] });
@@ -90,7 +91,7 @@ app.post('/upload', function(req, res) {
   // The name of the input field (i.e. "sampleFile") is used to retrieve the uploaded file
   let mapFile = req.files.mapUpload;
   let version = req.body.version;
-  let zipPath = conf.tempDir + mapFile.name;
+  let zipPath = config.tempDir + mapFile.name;
 
   // Verify version is valid
   if (!servers.includes(version))
@@ -101,7 +102,7 @@ app.post('/upload', function(req, res) {
     if (err)
       return res.json(createBadResponse(err));
 
-    var extractedFolderPath = conf.tempDir + mapFile.name.substring(0, mapFile.name.length - 4);
+    var extractedFolderPath = config.tempDir + mapFile.name.substring(0, mapFile.name.length - 4);
     var unzipResult = spawnSync('unzip', ['-o', '-d', extractedFolderPath, zipPath]);
     if (unzipResult.status == 0) {
       var mapDirectory = spawnSync('find', [extractedFolderPath, '-iname', 'level.dat'], {encoding: 'utf-8'}).stdout.trimRight();
@@ -153,6 +154,20 @@ app.post('/start', function(req, res) {
 
 app.get('/status', function(req, res) {
     res.json(createGoodResponse({result: isServerUp() ? "up" : "down"}));
+});
+
+app.get('/properties', function(req, res) {
+  if (servers.includes(req.query.version)) {
+    var propertiesPath = config.serverDir + `${req.query.version}/server.properties`;
+    fs.readFile(propertiesPath, {encoding: 'utf-8'}, function(err, data) {
+      if (!err) {
+        res.json(createGoodResponse({properties: propParser.parse(data)}));
+      } else
+        res.json(createBadResponse(err));
+    })
+  } else {
+    res.json(createBadResponse('Bad version.'));
+  }
 });
 
 app.get('', function(req, res) {
