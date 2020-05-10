@@ -84,13 +84,46 @@ function getProperties(version) {
     $.get('/properties', {'version': version})
     .done(function(res) {
         if (res.status == GOOD) {
-            showSuccess("Successfully grabbed properties");
+            // Delete old table cells
+            $('#tbodyProp').html("");
+
             Object.keys(res.properties).forEach(k => {
                 var row = $('<tr>');
                 row.append($('<th>').text(k));
-                row.append($('<td>').text(res.properties[k] == null ? 'null' : res.properties[k]));
-                $('#tableProp').append(row);
+
+                var button = $('<input type="button" class="cell-button">');
+                button.val(res.properties[k] == null ? '' : res.properties[k]);
+                button.click(function() {
+                    var val = $(this).val().toLowerCase();
+                    if (val === "true" || val === "false")
+                        bootbox.prompt({
+                            title: `Enter new value for ${$(this).parent().siblings().text()}:`,
+                            inputType: 'radio',
+                            value: val,
+                            inputOptions: [
+                                {text: "True", value: "true"},
+                                {text: "False", value: "false"}
+                            ],
+                            callback: function(result) {
+                                if (result)
+                                    button.val(result);
+                            }
+                        });
+                    else
+                        bootbox.prompt({
+                            title: `Enter new value for ${$(this).parent().siblings().text()}:`,
+                            placeholder: val,
+                            callback: function(result) {
+                                if (result)
+                                    button.val(result);
+                            }
+                        });
+                });
+                row.append($('<td class="align-middle">').append(button));
+                $('#tbodyProp').append(row);
             });
+
+            showSuccess("Successfully grabbed properties");
         }
         else
             showError("Failed to grab properties: " + res.message);

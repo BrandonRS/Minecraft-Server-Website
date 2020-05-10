@@ -40,8 +40,8 @@ html(lang="en")
             .col-4
                 h3 Edit Server Properties
                 #tableDiv.container-fluid
-                    table.table.table-bordered
-                        tbody#tableProp
+                    table#tableProp.table.table-sm
+                        tbody#tbodyProp
         .row
             .col
                 input#submit(type="submit" value='Submit')
@@ -65,4 +65,5 @@ html(lang="en")
     )
     script(src="/noty/lib/noty.min.js" type="text/javascript")
     script(src="http://malsup.github.com/jquery.form.js")
+    script(src='https://cdnjs.cloudflare.com/ajax/libs/bootbox.js/5.4.0/bootbox.min.js')
     script(src='/js/index.js' type="text/javascript")
