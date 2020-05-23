@@ -106,7 +106,9 @@ app.post('/upload', function(req, res) {
     var extractedFolderPath = config.tempDir + mapFile.name.substring(0, mapFile.name.length - 4);
     var unzipResult = spawnSync('unzip', ['-o', '-d', extractedFolderPath, zipPath]);
     if (unzipResult.status == 0) {
-      var mapDirectory = spawnSync('find', [extractedFolderPath, '-iname', 'level.dat'], {encoding: 'utf-8'}).stdout.trimRight();
+      var mapDirectories = spawnSync('find', [extractedFolderPath, '-iname', 'level.dat'], {encoding: 'utf-8'}).stdout.trimRight().split('\n');
+      var mapDirectory = mapDirectories[0];
+      
       if (mapDirectory.length > 0) {
         // Remove 'level.dat' from end of path
         mapDirectory = mapDirectory.substring(0, mapDirectory.length - 9);
@@ -127,7 +129,7 @@ app.post('/upload', function(req, res) {
     }
 
     // Clean up files/folders
-    spawnSync('rm', ['-rf', zipPath]);
+    // spawnSync('rm', ['-rf', zipPath]);
 
     if (isServerUp()) {
       console.log(`Server launched!\tVersion: ${version}\tMap name: ${mapFile.name}`)
