@@ -1,6 +1,20 @@
 const GOOD = 200, BAD = 400;
+var socket;
 
 $(function() {
+    socket = io.connect('http://cleft.fun:25000');
+    socket.on('connect', data => {
+        socket.emit('join', 'Hello from client');
+    });
+
+    socket.on('message', data => {
+        console.log(data);
+    });
+
+    socket.on('log', data => {
+        $('#log').append($('<tr>').text(data));
+    });
+
     $("form").ajaxForm({
         beforeSend: function() {
             $("#startServerForm").find("input").prop('disabled', true);
@@ -16,6 +30,7 @@ $(function() {
             if (res.status == GOOD) {
                 showSuccess("Server successfully started!");
                 updateStatusText();
+                $('#log').html('');
             } else {
                 showError("Failed to start server: " + res.message);
             }
@@ -24,6 +39,8 @@ $(function() {
 
     updateStatusText();
     getProperties($('#version').val());
+
+    $('#log').val('');
 });
 
 function showSuccess(text) {
@@ -45,7 +62,7 @@ function showError(text) {
 $('#submit').click(function(e) {
     e.preventDefault();
     getServerStatus(function(res) {
-        if (res.status == GOOD && res.result === "down") {
+        if (res.status == GOOD && !res.isUp) {
             var properties = {};
             $('#tbodyProp').children().each(function() {
                 var val = $(this).children('td').children('input').val();
@@ -67,20 +84,6 @@ $('#version').change(function() {
     getProperties($(this).val());
 });
 
-$("#startServer").click(function() {
-    $("#serverControl").find().prop("disabled", true);
-    $.post("/start")
-    .done(function(res) {
-        $("#serverControl").find().prop("disabled", false);
-        if (res.status == GOOD) {
-            showSuccess("Server successfully started!");
-            $("#statusText").text("Server is up!");
-        }
-        else
-            showError("Failed to start server: " + res.message);
-    });
-});
-
 $("#stopServer").click(function() {
     $("#serverControl").find().prop("disabled", true);
     $.post("/stop")
@@ -88,24 +91,49 @@ $("#stopServer").click(function() {
         $("#serverControl").find().prop("disabled", false);
         if (res.status == GOOD) {
             showSuccess("Server successfully stopped!");
-            $("#statusText").text("Server is down!");
+            updateStatusText();
         }
         else
             showError("Failed to stop server: " + res.message);
     });
 });
 
+$('#sendCommand').click(function() {
+    getServerStatus(function(res) {
+        if (res.status == GOOD && res.isUp) {
+            $('#sendCommand').prop('disabled', true);
+            $.post('/command', {command: $('#command').val()})
+            .done(function(res) {
+                $('#command').val('');
+                $('#sendCommand').prop('disabled', false);
+                if (res.status == GOOD)
+                    showSuccess('Command successfully sent!');
+                else
+                    showError(res.message);
+            });
+        }
+        else
+            showError('Server not up.');
+    });
+});
+
 function updateStatusText() {
     getServerStatus(function(res) {
-        $("#serverControl").find().prop("disabled", false);
-        if (res.status == GOOD) {
-            $("#statusText").text("Server is " + res.result + "!");
+        $("#serverControl").find('input').prop("disabled", false);
+        if (res.status == GOOD && res.isUp) {
+            $("#statusText").text("Server is up!");
+            $('#currentMapName').text(`Current map: ${res.currentMap}`);
+            $('#currentVersion').text(`Version: ${res.version}`);
+        } else {
+            $('#statusText').text('Server is down!');
+            $('#currentMapName').text('');
+            $('#currentVersion').text('');
         }
     });
 };
 
 function getServerStatus(callback) {
-    $("#serverControl").find().prop("disabled", true);
+    $("#serverControl").find('input').prop("disabled", true);
     $.get('/status')
     .done(callback);
 }

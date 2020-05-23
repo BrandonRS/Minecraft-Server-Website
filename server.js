@@ -45,10 +45,6 @@ function isServerUp() {
   return mcserver != null && mcserver.exitCode == null;
 }
 
-function startServer() {
-  
-}
-
 function startServer(version) {
   var versionDir = config.serverDir + version + '/';
   var serverPath = versionDir + 'server.jar';
@@ -56,7 +52,12 @@ function startServer(version) {
   var args = config.serverArgs.map(x => x);
   args.push('-jar', serverPath, 'nogui');
 
-  mcserver = spawn('java', args, { cwd: versionDir, stdio: ['pipe', 'ignore', 'ignore'] });
+  mcserver = spawn('java', args, { cwd: versionDir });
+
+  mcserver.stdout.setEncoding('utf-8');
+  mcserver.stdout.on('data', data => {
+    io.emit('log', data);
+  });
 }
 
 function stopServer(callback) {
@@ -130,6 +131,8 @@ app.post('/upload', function(req, res) {
 
     if (isServerUp()) {
       console.log(`Server launched!\tVersion: ${version}\tMap name: ${mapFile.name}`)
+      mcserver.currentMap = mapFile.name;
+      mcserver.version = version;
       res.json(createGoodResponse());
     } else {
       res.json(createBadResponse("Server failed to start. Check the log."));
@@ -147,17 +150,20 @@ app.post('/stop', function(req, res) {
     res.json(createBadResponse("Server is not up"));
 });
 
-app.post('/start', function(req, res) {
-  if (!isServerUp()) {
-    startServer();
+app.post('/command', function(req, res) {
+  if (isServerUp()) {
+    mcserver.stdin.write(req.body.command + '\n');
     res.json(createGoodResponse());
   }
   else
-    res.json(createBadResponse("Server is already up"));
+    res.json(createBadResponse("Server not up."));
 });
 
 app.get('/status', function(req, res) {
-    res.json(createGoodResponse({result: isServerUp() ? "up" : "down"}));
+  if (isServerUp())
+    res.json(createGoodResponse({isUp: true, version: mcserver.version, currentMap: mcserver.currentMap}));
+  else
+    res.json(createGoodResponse({isUp: false}));
 });
 
 app.get('/properties', function(req, res) {
@@ -178,6 +184,18 @@ app.get('', function(req, res) {
   renderWebpage(res);
 });
 
-app.listen(25000, function () {
+var server = app.listen(25000, function () {
   console.log('mcwebsite listening on port 25000!');
+});
+
+// Initialize socket.io
+var io = require('socket.io')(server);
+
+io.on('connection', function(client) {
+  console.log('Client connected...');
+  
+  client.on('join', data => {
+    console.log(data);
+    client.send('Hello from server');
+  });
 });
