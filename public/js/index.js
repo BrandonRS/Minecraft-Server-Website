@@ -3,9 +3,6 @@ var socket;
 
 $(function() {
     socket = io.connect('http://cleft.fun:25000');
-    socket.on('connect', data => {
-        socket.emit('join', 'Hello from client');
-    });
 
     socket.on('message', data => {
         console.log(data);

@@ -128,7 +128,7 @@ app.post('/upload', function(req, res) {
       spawnSync('rm', ['-rf', extractedFolderPath]);
     }
 
-    // Clean up files/folders
+    // Clean up zip file
     spawnSync('rm', ['-rf', zipPath]);
 
     if (isServerUp()) {
@@ -195,9 +195,4 @@ var io = require('socket.io')(server);
 
 io.on('connection', function(client) {
   console.log('Client connected...');
-  
-  client.on('join', data => {
-    console.log(data);
-    client.send('Hello from server');
-  });
 });

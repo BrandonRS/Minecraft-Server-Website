@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+    web:
+        container_name: mcwebsite
+        build: .
+        network_mode: host
+        ports:
+            - "25000:25000"
+        volumes:
+            - "/var/minecraft:/var/minecraft"
