@@ -2,7 +2,7 @@ const GOOD = 200, BAD = 400;
 var socket;
 
 $(function() {
-    socket = io.connect('http://cleft.fun:25000');
+    socket = io.connect('http://cleft.fun:5002', { path: '/socket.io' });
 
     socket.on('message', data => {
         console.log(data);

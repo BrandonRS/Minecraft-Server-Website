@@ -2,9 +2,11 @@ version: '3.8'
 services:
     web:
         container_name: mcwebsite
-        build: .
-        network_mode: host
+        build:
+            context: .
+            dockerfile: ./Dockerfile
         ports:
-            - "25000:25000"
+            - 5002:80
+            - 25566:25566
         volumes:
-            - "/var/minecraft:/var/minecraft"
+            - /var/minecraft:/var/minecraft

@@ -54,10 +54,13 @@ function startServer(version) {
 
   mcserver = spawn('java', args, { cwd: versionDir });
 
-  mcserver.stdout.setEncoding('utf-8');
-  mcserver.stdout.on('data', data => {
-    io.emit('log', data);
-  });
+  if (mcserver) {
+    console.log("init server");
+    mcserver.stdout.setEncoding('utf-8');
+    mcserver.stdout.on('data', data => {
+      io.emit('log', data);
+    });
+  }
 }
 
 function stopServer(callback) {
@@ -122,10 +125,14 @@ app.post('/upload', function(req, res) {
 
         // Launch server for version
         startServer(version);
+      } else {
+        console.log("Map dir length not greater than 0");
       }
 
       // Clean up extracted folder
       spawnSync('rm', ['-rf', extractedFolderPath]);
+    } else {
+      console.log("Failed to unzip");
     }
 
     // Clean up zip file
@@ -186,8 +193,8 @@ app.get('', function(req, res) {
   renderWebpage(res);
 });
 
-var server = app.listen(25000, function () {
-  console.log('mcwebsite listening on port 25000!');
+var server = app.listen(80, function () {
+  console.log('mcwebsite listening on port 80');
 });
 
 // Initialize socket.io
