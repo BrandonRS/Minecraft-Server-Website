@@ -2,7 +2,7 @@ const GOOD = 200, BAD = 400;
 var socket;
 
 $(function() {
-    socket = io.connect('http://cleft.fun:5002', { path: '/socket.io' });
+    socket = io.connect('https://cleft.fun', { path: '/minecraft/socket.io' });
 
     socket.on('message', data => {
         console.log(data);
@@ -83,7 +83,7 @@ $('#version').change(function() {
 
 $("#stopServer").click(function() {
     $("#serverControl").find().prop("disabled", true);
-    $.post("/stop")
+    $.post("/minecraft/stop")
     .done(function(res) {
         $("#serverControl").find().prop("disabled", false);
         if (res.status == GOOD) {
@@ -99,7 +99,7 @@ $('#sendCommand').click(function() {
     getServerStatus(function(res) {
         if (res.status == GOOD && res.isUp) {
             $('#sendCommand').prop('disabled', true);
-            $.post('/command', {command: $('#command').val()})
+            $.post('/minecraft/command', {command: $('#command').val()})
             .done(function(res) {
                 $('#command').val('');
                 $('#sendCommand').prop('disabled', false);
@@ -131,12 +131,12 @@ function updateStatusText() {
 
 function getServerStatus(callback) {
     $("#serverControl").find('input').prop("disabled", true);
-    $.get('/status')
+    $.get('/minecraft/status')
     .done(callback);
 }
 
 function getProperties(version) {
-    $.get('/properties', {'version': version})
+    $.get('/minecraft/properties', {'version': version})
     .done(function(res) {
         if (res.status == GOOD) {
             // Delete old table cells

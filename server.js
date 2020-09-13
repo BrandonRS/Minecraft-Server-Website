@@ -6,6 +6,7 @@ const config = require('./config');
 const fs = require('fs');
 const { spawn, spawnSync } = require('child_process');
 
+const prefix = '/minecraft';
 var mcserver;
 
 const getDirectories = source =>
@@ -13,6 +14,7 @@ const getDirectories = source =>
     dirent => dirent.isDirectory()).map(dirent => dirent.name);
 
 const app = express();
+app.set('trust proxy', true);
 
 // Get list of servers
 var servers = getDirectories(config.serverDir);
@@ -81,11 +83,11 @@ app.use(bodyParser.urlencoded({
   extended: true
 }));
 app.use(bodyParser.json());
-app.use(express.static('public'));
-app.use(express.static(__dirname + '/node_modules'));
+app.use(prefix, express.static('public'));
+app.use(prefix, express.static(__dirname + '/node_modules'));
 app.set('view engine', 'pug');
 
-app.post('/upload', function(req, res) {
+app.post(prefix + '/upload', function(req, res) {
   if (!req.files || Object.keys(req.files).length === 0) {
     return res.json(createBadResponse('No files were uploaded.'));
   }
@@ -149,7 +151,7 @@ app.post('/upload', function(req, res) {
   });
 });
 
-app.post('/stop', function(req, res) {
+app.post(prefix + '/stop', function(req, res) {
   if (isServerUp()) {
     stopServer(function() {
       res.json(createGoodResponse());
@@ -159,7 +161,7 @@ app.post('/stop', function(req, res) {
     res.json(createBadResponse("Server is not up"));
 });
 
-app.post('/command', function(req, res) {
+app.post(prefix + '/command', function(req, res) {
   if (isServerUp()) {
     mcserver.stdin.write(req.body.command + '\n');
     res.json(createGoodResponse());
@@ -168,14 +170,14 @@ app.post('/command', function(req, res) {
     res.json(createBadResponse("Server not up."));
 });
 
-app.get('/status', function(req, res) {
+app.get(prefix + '/status', function(req, res) {
   if (isServerUp())
     res.json(createGoodResponse({isUp: true, version: mcserver.version, currentMap: mcserver.currentMap}));
   else
     res.json(createGoodResponse({isUp: false}));
 });
 
-app.get('/properties', function(req, res) {
+app.get(prefix + '/properties', function(req, res) {
   if (servers.includes(req.query.version)) {
     var propertiesPath = config.serverDir + `${req.query.version}/server.properties`;
     fs.readFile(propertiesPath, {encoding: 'utf-8'}, function(err, data) {
@@ -189,7 +191,7 @@ app.get('/properties', function(req, res) {
   }
 });
 
-app.get('', function(req, res) {
+app.get(prefix, function(req, res) {
   renderWebpage(res);
 });
 
@@ -198,7 +200,7 @@ var server = app.listen(80, function () {
 });
 
 // Initialize socket.io
-var io = require('socket.io')(server);
+var io = require('socket.io')(server, { path: '/minecraft/socket.io' });
 
 io.on('connection', function(client) {
   console.log('Client connected...');
