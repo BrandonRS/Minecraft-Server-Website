@@ -1,6 +1,7 @@
 version: '3.8'
 services:
     web:
+        image: brandonrs/mcwebsite
         container_name: mcwebsite
         build:
             context: .
@@ -10,3 +11,4 @@ services:
             - 25566:25566
         volumes:
             - /var/minecraft:/var/minecraft
+        restart: unless-stopped
