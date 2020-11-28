@@ -1,30 +1,127 @@
+const fs = require('fs');
+const axios = require('axios');
+const path = require('path');
 const express = require('express');
 const fileUpload = require('express-fileupload');
 const bodyParser = require('body-parser');
 const propParser = require('minecraft-server-properties');
 const config = require('./config');
-const fs = require('fs');
-const { spawn, spawnSync } = require('child_process');
+const { spawn, spawnSync, execSync } = require('child_process');
 
 const prefix = '/minecraft';
 var mcserver;
 
-const getDirectories = source =>
-  fs.readdirSync(source, { withFileTypes: true }).filter(
-    dirent => dirent.isDirectory()).map(dirent => dirent.name);
-
 const app = express();
 app.set('trust proxy', true);
 
-// Get list of servers
-var servers = getDirectories(config.serverDir);
+if (!fs.existsSync(config.serverDir))
+  fs.mkdirSync(config.serverDir);
+
+var servers = [];
+
+function linesInFile(filePath) {
+  var output = execSync(`wc -l < ${filePath}`, { encoding: 'utf-8' });
+
+  if (output) {
+    return parseInt(output);
+  } else {
+    return 0;
+  }
+}
+
+async function getServers() {
+  return axios.get('https://papermc.io/api/v1/paper')
+  .then(resp => {
+    return resp.data.versions;
+  })
+  .catch(reason => {
+    console.error(`Failed to get servers: ${reason}`);
+    return [];
+  });
+}
 
 function replaceMapForVersion(version, newMapDir) {
-  var worldDir = config.serverDir + version + '/' + 'world/';
-  var result = spawnSync('rm', ['-rf', worldDir]);
+  let versionDir = path.join(config.serverDir, version)
+  var result = spawnSync('rm', ['-rf', path.join(versionDir, 'world*')]);
   if (result.status == 0) {
-    spawnSync('cp', ['-r', newMapDir, worldDir]);
+    spawnSync('cp', ['-r', newMapDir, path.join(versionDir, 'world')]);
   }
+}
+
+async function downloadServerJar(version) {
+  const downloadPath = path.join(config.serverDir, version, 'server.jar');
+  
+  return axios.request({
+    responseType: 'stream',
+    url: `https://papermc.io/api/v1/paper/${version}/latest/download`,
+    method: 'get'
+  })
+  .then(async response => {
+    for await (const chunk of response.data) {
+      fs.appendFileSync(downloadPath, chunk);
+    }
+    
+    return true;
+  })
+  .catch(error => {
+    console.log(`Failed to download JAR: ${error}`);
+    return false;
+  });
+}
+
+function confirmEULA(eulaPath) {
+  fs.writeFileSync(eulaPath, 'eula=true\n');
+}
+
+async function createServerFolder(version) {
+  const versionFolderPath = path.join(config.serverDir, version);
+  const jarPath = path.join(versionFolderPath, 'server.jar');
+
+  if (fs.existsSync(versionFolderPath))
+    return false;
+
+  fs.mkdirSync(versionFolderPath);
+
+  var success = await downloadServerJar(version);
+
+  if (success) {
+    spawnSync('java', ['-jar', jarPath], { encoding: 'utf-8', cwd: versionFolderPath });
+
+    if (!fs.existsSync(path.join(versionFolderPath, 'eula.txt')))
+      return false;
+
+    confirmEULA(path.join(versionFolderPath, 'eula.txt'));
+
+    success = true;
+  }
+
+  return success;
+}
+
+function loadProperties(version) {
+  let versionFolder = path.join(config.serverDir, version);
+  let args = ['-jar', path.join(versionFolder, 'server.jar')];
+
+  var tempServer = spawn('java', args, { cwd: versionFolder });
+
+  if (tempServer) {
+    var found = false;
+
+    tempServer.stdout.setEncoding('utf-8');
+    tempServer.stdout.on('data', data => {
+      found =  data.includes("Default game");
+    });
+
+    return new Promise(async resolve => {
+      while (!found && tempServer.exitCode == null) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
+      resolve(found);
+    });
+  }
+
+  return Promise.resolve(false);
 }
 
 function createGoodResponse(extra) {
@@ -73,11 +170,11 @@ function stopServer(callback) {
   }
 }
 
-function renderWebpage(res) {
+async function renderWebpage(res) {
+  servers = await getServers();
   res.render('index', { message: isServerUp() ? "up!" : "down!", servers: servers });
 }
 
-// Add capabilities to app
 app.use(fileUpload());
 app.use(bodyParser.urlencoded({
   extended: true
@@ -87,7 +184,7 @@ app.use(prefix, express.static('public'));
 app.use(prefix, express.static(__dirname + '/node_modules'));
 app.set('view engine', 'pug');
 
-app.post(prefix + '/upload', function(req, res) {
+app.post(path.join(prefix, 'upload'), (req, res) => {
   if (!req.files || Object.keys(req.files).length === 0) {
     return res.json(createBadResponse('No files were uploaded.'));
   }
@@ -97,14 +194,13 @@ app.post(prefix + '/upload', function(req, res) {
   // The name of the input field (i.e. "sampleFile") is used to retrieve the uploaded file
   let mapFile = req.files.mapUpload;
   let version = req.body.version;
-  let zipPath = config.tempDir + mapFile.name;
+  let zipPath = path.join(config.tempDir, mapFile.name);
 
-  // Verify version is valid
-  if (!servers.includes(version))
-    res.json(createBadResponse(`Version ${version} is not valid.`));
+  if (!servers.includes(version)) {
+    return res.json(createBadResponse("Version not valid"));
+  }
 
-  // move mapFile to temp directory
-  mapFile.mv(zipPath, function(err) {
+  mapFile.mv(zipPath, (err) => {
     if (err)
       return res.json(createBadResponse(err));
 
@@ -118,26 +214,21 @@ app.post(prefix + '/upload', function(req, res) {
         // Remove 'level.dat' from end of path
         mapDirectory = mapDirectory.substring(0, mapDirectory.length - 9);
 
-        // Remove old world dir from given version's directory
         replaceMapForVersion(version, mapDirectory);
 
-        // Set properties for version
-        var propertiesPath = config.serverDir + `${version}/server.properties`;
+        var propertiesPath = path.join(config.serverDir, version, 'server.properties');
         fs.writeFileSync(propertiesPath, propParser.stringify(JSON.parse(req.body.properties)));
 
-        // Launch server for version
         startServer(version);
       } else {
         console.log("Map dir length not greater than 0");
       }
 
-      // Clean up extracted folder
       spawnSync('rm', ['-rf', extractedFolderPath]);
     } else {
       console.log("Failed to unzip");
     }
 
-    // Clean up zip file
     spawnSync('rm', ['-rf', zipPath]);
 
     if (isServerUp()) {
@@ -151,7 +242,7 @@ app.post(prefix + '/upload', function(req, res) {
   });
 });
 
-app.post(prefix + '/stop', function(req, res) {
+app.post(path.join(prefix, 'stop'), (req, res) => {
   if (isServerUp()) {
     stopServer(function() {
       res.json(createGoodResponse());
@@ -161,7 +252,7 @@ app.post(prefix + '/stop', function(req, res) {
     res.json(createBadResponse("Server is not up"));
 });
 
-app.post(prefix + '/command', function(req, res) {
+app.post(path.join(prefix, 'command'), (req, res) => {
   if (isServerUp()) {
     mcserver.stdin.write(req.body.command + '\n');
     res.json(createGoodResponse());
@@ -170,16 +261,27 @@ app.post(prefix + '/command', function(req, res) {
     res.json(createBadResponse("Server not up."));
 });
 
-app.get(prefix + '/status', function(req, res) {
+app.get(path.join(prefix, 'status'), (req, res) => {
   if (isServerUp())
     res.json(createGoodResponse({isUp: true, version: mcserver.version, currentMap: mcserver.currentMap}));
   else
     res.json(createGoodResponse({isUp: false}));
 });
 
-app.get(prefix + '/properties', function(req, res) {
+app.get(path.join(prefix, 'properties'), async (req, res) => {
   if (servers.includes(req.query.version)) {
-    var propertiesPath = config.serverDir + `${req.query.version}/server.properties`;
+    if (!fs.existsSync(path.join(config.serverDir, req.query.version)))
+      await createServerFolder(req.query.version);
+
+    var propertiesPath = path.join(config.serverDir, req.query.version, 'server.properties');
+
+    if (!fs.existsSync(propertiesPath) || linesInFile(propertiesPath) < 5) {
+      var result = await loadProperties(req.query.version);
+
+      if (!result)
+        return res.json(createBadResponse("Failed to load properties."));
+    }
+
     fs.readFile(propertiesPath, {encoding: 'utf-8'}, function(err, data) {
       if (!err) {
         res.json(createGoodResponse({properties: propParser.parse(data)}));
@@ -191,16 +293,15 @@ app.get(prefix + '/properties', function(req, res) {
   }
 });
 
-app.get(prefix, function(req, res) {
-  renderWebpage(res);
+app.get(prefix, async (req, res) => {
+  await renderWebpage(res);
 });
 
-var server = app.listen(80, function () {
-  console.log('mcwebsite listening on port 80');
+var server = app.listen(config.port, function () {
+  console.log(`mcwebsite listening on port ${config.port}`);
 });
 
-// Initialize socket.io
-var io = require('socket.io')(server, { path: '/minecraft/socket.io' });
+var io = require('socket.io')(server, { path: path.join(prefix, 'socket.io') });
 
 io.on('connection', function(client) {
   console.log('Client connected...');

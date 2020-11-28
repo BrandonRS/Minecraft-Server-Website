@@ -136,12 +136,22 @@ function getServerStatus(callback) {
 }
 
 function getProperties(version) {
-    $.get('/minecraft/properties', {'version': version})
-    .done(function(res) {
-        if (res.status == GOOD) {
-            // Delete old table cells
-            $('#tbodyProp').html("");
+    var n = new Noty({
+        type: 'info',
+        timeout: false,
+        text: "Retrieving properties...",
+        closeWith: []
+    });
+    n.show();
 
+    $('#tbodyProp').html("");
+
+    $("#version").prop('disabled', 'disabled');
+    $("#propertiesOverlay").show();
+    $.get('/minecraft/properties', {'version': version})
+    .done((res) => {
+        n.close();
+        if (res.status == GOOD) {
             Object.keys(res.properties).sort().forEach(k => {
                 var row = $('<tr>');
                 row.append($('<th>').text(k));
@@ -177,7 +187,11 @@ function getProperties(version) {
                 row.append($('<td class="align-middle">').append(button));
                 $('#tbodyProp').append(row);
             });
+        } else {
+            showError("Failed to retrieve properties.");
         }
+        $("#propertiesOverlay").hide();
+        $("#version").prop('disabled', false);
     });
 }
 
