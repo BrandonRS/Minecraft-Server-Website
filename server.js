@@ -1,9 +1,11 @@
+const fs = require('fs');
+const axios = require('axios');
+const path = require('path');
 const express = require('express');
 const fileUpload = require('express-fileupload');
 const bodyParser = require('body-parser');
 const propParser = require('minecraft-server-properties');
 const config = require('./config');
-const fs = require('fs');
 const { spawn, spawnSync } = require('child_process');
 
 const prefix = '/minecraft';
@@ -25,6 +27,68 @@ function replaceMapForVersion(version, newMapDir) {
   if (result.status == 0) {
     spawnSync('cp', ['-r', newMapDir, worldDir]);
   }
+}
+
+function isVersionValid(version) {
+  axios.get('https://papermc.io/api/v1/paper')
+  .then(resp => {
+    return resp.versions.includes(version);
+  })
+  .catch(error => {
+    return false;
+  });
+}
+
+function downloadServerJar(version, callback) {
+  const downloadPath = path.join(config.serverDir, version, 'server.jar');
+  
+  axios.request({
+    responseType: 'stream',
+    url: `https://papermc.io/api/v1/paper/${version}/latest/download`,
+    method: 'get'
+  })
+  .then(async response => {
+    for await (const chunk of response.data) {
+      fs.appendFileSync(downloadPath, chunk);
+    }
+
+    return callback();
+  })
+  .catch(error => {
+    console.log(error);
+  });
+}
+
+function confirmEULA(eulaPath) {
+  //var contents = fs.readFileSync(eulaPath, { encoding: 'utf-8' });
+  //contents = contents.replace(/eula=false/, 'eula=true');
+  //fs.writeFileSync(eulaPath, contents);
+  fs.writeFileSync(eulaPath, 'eula=true\n');
+}
+
+function createServerFolder(version) {
+  const versionFolderPath = path.join(config.serverDir, version);
+  const jarPath = path.join(versionFolderPath, 'server.jar');
+
+  // Remove after testing
+  fs.rmdirSync(versionFolderPath, { recursive: true });
+  // Remove after testing
+
+  fs.mkdirSync(versionFolderPath);
+
+  console.log('About to download JAR');
+
+  downloadServerJar(version, () => {
+    console.log("Successfully downloaded JAR");
+
+    spawnSync('java', ['-jar', jarPath], { encoding: 'utf-8', cwd: versionFolderPath });
+
+    if (!fs.existsSync(path.join(versionFolderPath, 'eula.txt')))
+      return false;
+
+    confirmEULA(path.join(versionFolderPath, 'eula.txt'));
+    console.log("Confirmed EULA!");
+  });
 }
 
 function createGoodResponse(extra) {
@@ -100,8 +164,14 @@ app.post(prefix + '/upload', function(req, res) {
   let zipPath = config.tempDir + mapFile.name;
 
   // Verify version is valid
-  if (!servers.includes(version))
-    res.json(createBadResponse(`Version ${version} is not valid.`));
+  if (!isVersionValid(version)) {
+    return res.json(createBadResponse("Version not valid"));
+  }
+
+  // Create server folder if absent
+  if (!fs.existsSync(config.serverDir + version)) {
+    createServerFolder(version);
+  }
 
   // move mapFile to temp directory
   mapFile.mv(zipPath, function(err) {
@@ -189,6 +259,26 @@ app.get(prefix + '/properties', function(req, res) {
   } else {
     res.json(createBadResponse('Bad version.'));
   }
+});
+
+app.get(prefix + '/create', (req, res) => {
+  if (createServerFolder(req.query.version))
+    return res.json("I guess it went well.");  
+  return res.json("Did not go well!");
+});
+
+var testServer;
+
+app.get(prefix + '/goup', (req, res) => {
+  testServer = spawn('java', ['-jar', '/var/minecraft/1.16.3/server.jar'], { stdio: ['inherit', 'inherit', 'inherit'], cwd: '/var/minecraft/1.16.3' });
+
+  return res.json("Done");
+});
+
+app.get(prefix + '/godown', (req, res) => {
+  testServer.kill();
+
+  return res.json("Done");
 });
 
 app.get(prefix, function(req, res) {
