@@ -41,9 +41,10 @@ async function getServers() {
 }
 
 function replaceMapForVersion(version, newMapDir) {
-  var result = spawnSync('rm', ['-rf', path.join(config.serverDir, version, 'world*')]);
+  let versionDir = path.join(config.serverDir, version)
+  var result = spawnSync('rm', ['-rf', path.join(versionDir, 'world*')]);
   if (result.status == 0) {
-    spawnSync('cp', ['-r', newMapDir, worldDir]);
+    spawnSync('cp', ['-r', newMapDir, path.join(versionDir, 'world')]);
   }
 }
 
