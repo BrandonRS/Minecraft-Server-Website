@@ -6,7 +6,7 @@ const fileUpload = require('express-fileupload');
 const bodyParser = require('body-parser');
 const propParser = require('minecraft-server-properties');
 const config = require('./config');
-const { spawn, spawnSync } = require('child_process');
+const { spawn, spawnSync, execSync } = require('child_process');
 
 const prefix = '/minecraft';
 var mcserver;
@@ -18,6 +18,16 @@ if (!fs.existsSync(config.serverDir))
   fs.mkdirSync(config.serverDir);
 
 var servers = [];
+
+function linesInFile(filePath) {
+  var output = execSync(`wc -l < ${filePath}`, { encoding: 'utf-8' });
+
+  if (output) {
+    return parseInt(output);
+  } else {
+    return 0;
+  }
+}
 
 async function getServers() {
   return axios.get('https://papermc.io/api/v1/paper')
@@ -37,10 +47,10 @@ function replaceMapForVersion(version, newMapDir) {
   }
 }
 
-function downloadServerJar(version, callback) {
+async function downloadServerJar(version) {
   const downloadPath = path.join(config.serverDir, version, 'server.jar');
   
-  axios.request({
+  return axios.request({
     responseType: 'stream',
     url: `https://papermc.io/api/v1/paper/${version}/latest/download`,
     method: 'get'
@@ -49,11 +59,12 @@ function downloadServerJar(version, callback) {
     for await (const chunk of response.data) {
       fs.appendFileSync(downloadPath, chunk);
     }
-
-    return callback();
+    
+    return true;
   })
   .catch(error => {
-    console.log(error);
+    console.log(`Failed to download JAR: ${error}`);
+    return false;
   });
 }
 
@@ -61,28 +72,55 @@ function confirmEULA(eulaPath) {
   fs.writeFileSync(eulaPath, 'eula=true\n');
 }
 
-function createServerFolder(version) {
+async function createServerFolder(version) {
   const versionFolderPath = path.join(config.serverDir, version);
   const jarPath = path.join(versionFolderPath, 'server.jar');
 
   if (fs.existsSync(versionFolderPath))
-    return;
+    return false;
 
   fs.mkdirSync(versionFolderPath);
 
-  console.log('About to download JAR');
+  var success = await downloadServerJar(version);
 
-  downloadServerJar(version, () => {
-    console.log("Successfully downloaded JAR");
-
+  if (success) {
     spawnSync('java', ['-jar', jarPath], { encoding: 'utf-8', cwd: versionFolderPath });
 
     if (!fs.existsSync(path.join(versionFolderPath, 'eula.txt')))
-      return;
+      return false;
 
     confirmEULA(path.join(versionFolderPath, 'eula.txt'));
-    console.log("Confirmed EULA!");
-  });
+
+    success = true;
+  }
+
+  return success;
+}
+
+function loadProperties(version) {
+  let versionFolder = path.join(config.serverDir, version);
+  let args = ['-jar', path.join(versionFolder, 'server.jar')];
+
+  var tempServer = spawn('java', args, { cwd: versionFolder });
+
+  if (tempServer) {
+    var found = false;
+
+    tempServer.stdout.setEncoding('utf-8');
+    tempServer.stdout.on('data', data => {
+      found =  data.includes("Default game");
+    });
+
+    return new Promise(async resolve => {
+      while (!found && tempServer.exitCode == null) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
+      resolve(found);
+    });
+  }
+
+  return Promise.resolve(false);
 }
 
 function createGoodResponse(extra) {
@@ -237,12 +275,20 @@ app.get(path.join(prefix, 'status'), (req, res) => {
     res.json(createGoodResponse({isUp: false}));
 });
 
-app.get(path.join(prefix, 'properties'), (req, res) => {
+app.get(path.join(prefix, 'properties'), async (req, res) => {
   if (servers.includes(req.query.version)) {
     if (!fs.existsSync(path.join(config.serverDir, req.query.version)))
-      createServerFolder(req.query.version);
+      await createServerFolder(req.query.version);
 
     var propertiesPath = path.join(config.serverDir, req.query.version, 'server.properties');
+
+    if (!fs.existsSync(propertiesPath) || linesInFile(propertiesPath) < 5) {
+      var result = await loadProperties(req.query.version);
+
+      if (!result)
+        return res.json(createBadResponse("Failed to load properties."));
+    }
+
     fs.readFile(propertiesPath, {encoding: 'utf-8'}, function(err, data) {
       if (!err) {
         res.json(createGoodResponse({properties: propParser.parse(data)}));
