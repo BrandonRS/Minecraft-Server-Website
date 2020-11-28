@@ -175,7 +175,6 @@ async function renderWebpage(res) {
   res.render('index', { message: isServerUp() ? "up!" : "down!", servers: servers });
 }
 
-// Add capabilities to app
 app.use(fileUpload());
 app.use(bodyParser.urlencoded({
   extended: true
@@ -197,13 +196,11 @@ app.post(path.join(prefix, 'upload'), (req, res) => {
   let version = req.body.version;
   let zipPath = path.join(config.tempDir, mapFile.name);
 
-  // Verify version is valid
   if (!servers.includes(version)) {
     return res.json(createBadResponse("Version not valid"));
   }
 
-  // move mapFile to temp directory
-  mapFile.mv(zipPath, function(err) {
+  mapFile.mv(zipPath, (err) => {
     if (err)
       return res.json(createBadResponse(err));
 
@@ -217,26 +214,21 @@ app.post(path.join(prefix, 'upload'), (req, res) => {
         // Remove 'level.dat' from end of path
         mapDirectory = mapDirectory.substring(0, mapDirectory.length - 9);
 
-        // Remove old world dir from given version's directory
         replaceMapForVersion(version, mapDirectory);
 
-        // Set properties for version
         var propertiesPath = path.join(config.serverDir, version, 'server.properties');
         fs.writeFileSync(propertiesPath, propParser.stringify(JSON.parse(req.body.properties)));
 
-        // Launch server for version
         startServer(version);
       } else {
         console.log("Map dir length not greater than 0");
       }
 
-      // Clean up extracted folder
       spawnSync('rm', ['-rf', extractedFolderPath]);
     } else {
       console.log("Failed to unzip");
     }
 
-    // Clean up zip file
     spawnSync('rm', ['-rf', zipPath]);
 
     if (isServerUp()) {
@@ -309,7 +301,6 @@ var server = app.listen(config.port, function () {
   console.log(`mcwebsite listening on port ${config.port}`);
 });
 
-// Initialize socket.io
 var io = require('socket.io')(server, { path: path.join(prefix, 'socket.io') });
 
 io.on('connection', function(client) {
