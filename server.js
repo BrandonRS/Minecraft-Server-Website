@@ -11,32 +11,30 @@ const { spawn, spawnSync } = require('child_process');
 const prefix = '/minecraft';
 var mcserver;
 
-const getDirectories = source =>
-  fs.readdirSync(source, { withFileTypes: true }).filter(
-    dirent => dirent.isDirectory()).map(dirent => dirent.name);
-
 const app = express();
 app.set('trust proxy', true);
 
-// Get list of servers
-var servers = getDirectories(config.serverDir);
+if (!fs.existsSync(config.serverDir))
+  fs.mkdirSync(config.serverDir);
+
+var servers = [];
+
+async function getServers() {
+  return axios.get('https://papermc.io/api/v1/paper')
+  .then(resp => {
+    return resp.data.versions;
+  })
+  .catch(reason => {
+    console.error(`Failed to get servers: ${reason}`);
+    return [];
+  });
+}
 
 function replaceMapForVersion(version, newMapDir) {
-  var worldDir = config.serverDir + version + '/' + 'world/';
-  var result = spawnSync('rm', ['-rf', worldDir]);
+  var result = spawnSync('rm', ['-rf', path.join(config.serverDir, version, 'world*')]);
   if (result.status == 0) {
     spawnSync('cp', ['-r', newMapDir, worldDir]);
   }
-}
-
-function isVersionValid(version) {
-  axios.get('https://papermc.io/api/v1/paper')
-  .then(resp => {
-    return resp.versions.includes(version);
-  })
-  .catch(error => {
-    return false;
-  });
 }
 
 function downloadServerJar(version, callback) {
@@ -60,9 +58,6 @@ function downloadServerJar(version, callback) {
 }
 
 function confirmEULA(eulaPath) {
-  //var contents = fs.readFileSync(eulaPath, { encoding: 'utf-8' });
-  //contents = contents.replace(/eula=false/, 'eula=true');
-  //fs.writeFileSync(eulaPath, contents);
   fs.writeFileSync(eulaPath, 'eula=true\n');
 }
 
@@ -70,9 +65,8 @@ function createServerFolder(version) {
   const versionFolderPath = path.join(config.serverDir, version);
   const jarPath = path.join(versionFolderPath, 'server.jar');
 
-  // Remove after testing
-  fs.rmdirSync(versionFolderPath, { recursive: true });
-  // Remove after testing
+  if (fs.existsSync(versionFolderPath))
+    return;
 
   fs.mkdirSync(versionFolderPath);
 
@@ -84,7 +78,7 @@ function createServerFolder(version) {
     spawnSync('java', ['-jar', jarPath], { encoding: 'utf-8', cwd: versionFolderPath });
 
     if (!fs.existsSync(path.join(versionFolderPath, 'eula.txt')))
-      return false;
+      return;
 
     confirmEULA(path.join(versionFolderPath, 'eula.txt'));
     console.log("Confirmed EULA!");
@@ -137,7 +131,8 @@ function stopServer(callback) {
   }
 }
 
-function renderWebpage(res) {
+async function renderWebpage(res) {
+  servers = await getServers();
   res.render('index', { message: isServerUp() ? "up!" : "down!", servers: servers });
 }
 
@@ -151,7 +146,7 @@ app.use(prefix, express.static('public'));
 app.use(prefix, express.static(__dirname + '/node_modules'));
 app.set('view engine', 'pug');
 
-app.post(prefix + '/upload', function(req, res) {
+app.post(path.join(prefix, 'upload'), (req, res) => {
   if (!req.files || Object.keys(req.files).length === 0) {
     return res.json(createBadResponse('No files were uploaded.'));
   }
@@ -161,16 +156,11 @@ app.post(prefix + '/upload', function(req, res) {
   // The name of the input field (i.e. "sampleFile") is used to retrieve the uploaded file
   let mapFile = req.files.mapUpload;
   let version = req.body.version;
-  let zipPath = config.tempDir + mapFile.name;
+  let zipPath = path.join(config.tempDir, mapFile.name);
 
   // Verify version is valid
-  if (!isVersionValid(version)) {
+  if (!servers.includes(version)) {
     return res.json(createBadResponse("Version not valid"));
-  }
-
-  // Create server folder if absent
-  if (!fs.existsSync(config.serverDir + version)) {
-    createServerFolder(version);
   }
 
   // move mapFile to temp directory
@@ -192,7 +182,7 @@ app.post(prefix + '/upload', function(req, res) {
         replaceMapForVersion(version, mapDirectory);
 
         // Set properties for version
-        var propertiesPath = config.serverDir + `${version}/server.properties`;
+        var propertiesPath = path.join(config.serverDir, version, 'server.properties');
         fs.writeFileSync(propertiesPath, propParser.stringify(JSON.parse(req.body.properties)));
 
         // Launch server for version
@@ -221,7 +211,7 @@ app.post(prefix + '/upload', function(req, res) {
   });
 });
 
-app.post(prefix + '/stop', function(req, res) {
+app.post(path.join(prefix, 'stop'), (req, res) => {
   if (isServerUp()) {
     stopServer(function() {
       res.json(createGoodResponse());
@@ -231,7 +221,7 @@ app.post(prefix + '/stop', function(req, res) {
     res.json(createBadResponse("Server is not up"));
 });
 
-app.post(prefix + '/command', function(req, res) {
+app.post(path.join(prefix, 'command'), (req, res) => {
   if (isServerUp()) {
     mcserver.stdin.write(req.body.command + '\n');
     res.json(createGoodResponse());
@@ -240,16 +230,19 @@ app.post(prefix + '/command', function(req, res) {
     res.json(createBadResponse("Server not up."));
 });
 
-app.get(prefix + '/status', function(req, res) {
+app.get(path.join(prefix, 'status'), (req, res) => {
   if (isServerUp())
     res.json(createGoodResponse({isUp: true, version: mcserver.version, currentMap: mcserver.currentMap}));
   else
     res.json(createGoodResponse({isUp: false}));
 });
 
-app.get(prefix + '/properties', function(req, res) {
+app.get(path.join(prefix, 'properties'), (req, res) => {
   if (servers.includes(req.query.version)) {
-    var propertiesPath = config.serverDir + `${req.query.version}/server.properties`;
+    if (!fs.existsSync(path.join(config.serverDir, req.query.version)))
+      createServerFolder(req.query.version);
+
+    var propertiesPath = path.join(config.serverDir, req.query.version, 'server.properties');
     fs.readFile(propertiesPath, {encoding: 'utf-8'}, function(err, data) {
       if (!err) {
         res.json(createGoodResponse({properties: propParser.parse(data)}));
@@ -261,36 +254,16 @@ app.get(prefix + '/properties', function(req, res) {
   }
 });
 
-app.get(prefix + '/create', (req, res) => {
-  if (createServerFolder(req.query.version))
-    return res.json("I guess it went well.");  
-  return res.json("Did not go well!");
+app.get(prefix, async (req, res) => {
+  await renderWebpage(res);
 });
 
-var testServer;
-
-app.get(prefix + '/goup', (req, res) => {
-  testServer = spawn('java', ['-jar', '/var/minecraft/1.16.3/server.jar'], { stdio: ['inherit', 'inherit', 'inherit'], cwd: '/var/minecraft/1.16.3' });
-
-  return res.json("Done");
-});
-
-app.get(prefix + '/godown', (req, res) => {
-  testServer.kill();
-
-  return res.json("Done");
-});
-
-app.get(prefix, function(req, res) {
-  renderWebpage(res);
-});
-
-var server = app.listen(80, function () {
-  console.log('mcwebsite listening on port 80');
+var server = app.listen(config.port, function () {
+  console.log(`mcwebsite listening on port ${config.port}`);
 });
 
 // Initialize socket.io
-var io = require('socket.io')(server, { path: '/minecraft/socket.io' });
+var io = require('socket.io')(server, { path: path.join(prefix, 'socket.io') });
 
 io.on('connection', function(client) {
   console.log('Client connected...');

@@ -30,7 +30,7 @@ html(lang="en")
             .col-4
                 label(for="version") Select Version
                 select#version.form-control(name="version")
-                        - for (var i = servers.length - 1; i >= 0; i--)
+                        - for (var i = 0; i < servers.length; i++)
                             option(value=servers[i]) #{servers[i]}
             .col-4
                 label(for='mapUpload') Upload Map
