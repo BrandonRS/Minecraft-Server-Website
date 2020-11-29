@@ -8,9 +8,9 @@ html(lang="en")
         integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh"
         crossorigin="anonymous"
     )
-    link(href="/minecraft/noty/lib/noty.css" rel="stylesheet")
-    link(href='/minecraft/noty/lib/themes/mint.css' rel='stylesheet')
-    link(href="/minecraft/style/stylesheet.css" rel="stylesheet")
+    link(href=`${prefix}/noty/lib/noty.css` rel="stylesheet")
+    link(href=`${prefix}/noty/lib/themes/mint.css` rel='stylesheet')
+    link(href=`${prefix}/style/stylesheet.css` rel="stylesheet")
   body
     .jumbotron
         .container
@@ -24,7 +24,7 @@ html(lang="en")
                     h2#currentMapName
                     h2#currentVersion
 
-    form#startServerForm.container(action='/minecraft/upload' method='POST' enctype="multipart/form-data")
+    form#startServerForm.container(action=`${prefix}/upload` method='POST' enctype="multipart/form-data")
         input#inputProp(type='hidden' name='properties')
         .row
             .col-4
@@ -75,8 +75,10 @@ html(lang="en")
         integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6"
         crossorigin="anonymous"
     )
-    script(src="/minecraft/noty/lib/noty.min.js" type="text/javascript")
-    script(src="/minecraft/js/jquery.form.js" type="text/javascript")
+    script(src=`${prefix}/noty/lib/noty.min.js` type="text/javascript")
+    script(src=`${prefix}/js/jquery.form.js` type="text/javascript")
     script(src='https://cdnjs.cloudflare.com/ajax/libs/bootbox.js/5.4.0/bootbox.min.js')
-    script(src='/minecraft/socket.io-client/dist/socket.io.slim.js')
-    script(src='/minecraft/js/index.js' type="text/javascript")
+    script(src=`${prefix}/socket.io-client/dist/socket.io.slim.js`)
+    script
+        = `const prefix = '${prefix}';`
+    script(src=`${prefix}/js/index.js` type="text/javascript")

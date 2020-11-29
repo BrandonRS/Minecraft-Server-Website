@@ -2,11 +2,7 @@ const GOOD = 200, BAD = 400;
 var socket;
 
 $(function() {
-    socket = io.connect('https://cleft.fun', { path: '/minecraft/socket.io' });
-
-    socket.on('message', data => {
-        console.log(data);
-    });
+    socket = io.connect('https://cleft.fun', { path: `${prefix}/socket.io` });
 
     socket.on('log', data => {
         $('#log').append($('<tr>').text(data));
@@ -83,7 +79,7 @@ $('#version').change(function() {
 
 $("#stopServer").click(function() {
     $("#serverControl").find().prop("disabled", true);
-    $.post("/minecraft/stop")
+    $.post(`${prefix}/stop`)
     .done(function(res) {
         $("#serverControl").find().prop("disabled", false);
         if (res.status == GOOD) {
@@ -99,7 +95,7 @@ $('#sendCommand').click(function() {
     getServerStatus(function(res) {
         if (res.status == GOOD && res.isUp) {
             $('#sendCommand').prop('disabled', true);
-            $.post('/minecraft/command', {command: $('#command').val()})
+            $.post(`${prefix}/command`, {command: $('#command').val()})
             .done(function(res) {
                 $('#command').val('');
                 $('#sendCommand').prop('disabled', false);
@@ -131,7 +127,7 @@ function updateStatusText() {
 
 function getServerStatus(callback) {
     $("#serverControl").find('input').prop("disabled", true);
-    $.get('/minecraft/status')
+    $.get(`${prefix}/status`)
     .done(callback);
 }
 
@@ -148,7 +144,7 @@ function getProperties(version) {
 
     $("#version").prop('disabled', 'disabled');
     $("#propertiesOverlay").show();
-    $.get('/minecraft/properties', {'version': version})
+    $.get(`${prefix}/properties`, {'version': version})
     .done((res) => {
         n.close();
         if (res.status == GOOD) {

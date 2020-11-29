@@ -172,7 +172,7 @@ function stopServer(callback) {
 
 async function renderWebpage(res) {
   servers = await getServers();
-  res.render('index', { message: isServerUp() ? "up!" : "down!", servers: servers });
+  res.render('index', { servers: servers, prefix: prefix });
 }
 
 app.use(fileUpload());
@@ -283,11 +283,11 @@ app.get(path.join(prefix, 'properties'), async (req, res) => {
     }
 
     fs.readFile(propertiesPath, {encoding: 'utf-8'}, function(err, data) {
-      if (!err) {
+      if (!err)
         res.json(createGoodResponse({properties: propParser.parse(data)}));
-      } else
+      else
         res.json(createBadResponse(err));
-    })
+    });
   } else {
     res.json(createBadResponse('Bad version.'));
   }
