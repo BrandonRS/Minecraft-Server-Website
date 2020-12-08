@@ -2,3 +2,5 @@ node_modules
 npm-debug.log
 README.md
 .gitignore
+docker-compose.yaml
+Dockerfile

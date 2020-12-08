@@ -145,10 +145,10 @@ function isServerUp() {
 }
 
 function startServer(version) {
-  var versionDir = config.serverDir + version + '/';
-  var serverPath = versionDir + 'server.jar';
+  var versionDir = path.join(config.serverDir, version);
+  var serverPath = path.join(versionDir, 'server.jar');
 
-  var args = config.serverArgs.map(x => x);
+  var args = config.serverArgs.split(' ');
   args.push('-jar', serverPath, 'nogui');
 
   mcserver = spawn('java', args, { cwd: versionDir });
@@ -181,7 +181,7 @@ app.use(bodyParser.urlencoded({
 }));
 app.use(bodyParser.json());
 app.use(prefix, express.static('public'));
-app.use(prefix, express.static(__dirname + '/node_modules'));
+app.use(prefix, express.static(path.join(__dirname, '/node_modules')));
 app.set('view engine', 'pug');
 
 app.post(path.join(prefix, 'upload'), (req, res) => {
@@ -204,7 +204,7 @@ app.post(path.join(prefix, 'upload'), (req, res) => {
     if (err)
       return res.json(createBadResponse(err));
 
-    var extractedFolderPath = config.tempDir + mapFile.name.substring(0, mapFile.name.length - 4);
+    var extractedFolderPath = path.join(config.tempDir, mapFile.name.substring(0, mapFile.name.length - 4));
     var unzipResult = spawnSync('unzip', ['-o', '-d', extractedFolderPath, zipPath]);
     if (unzipResult.status == 0) {
       var mapDirectories = spawnSync('find', [extractedFolderPath, '-iname', 'level.dat'], {encoding: 'utf-8'}).stdout.trimRight().split('\n');

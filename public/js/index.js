@@ -1,4 +1,13 @@
 const GOOD = 200, BAD = 400;
+const basicSettings = [
+    'difficulty',
+    'enable-command-block',
+    'gamemode',
+    'max-players',
+    'motd',
+    'pvp',
+    'server-port'
+];
 var socket;
 
 $(function() {
