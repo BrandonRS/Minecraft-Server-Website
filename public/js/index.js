@@ -226,7 +226,6 @@ $("#buttonBasic").click(() => {
         basicMode = true;
         loadProperties();
     }
-    $('.pagination').blur();
 });
 
 $('#buttonAdvanced').click(() => {
