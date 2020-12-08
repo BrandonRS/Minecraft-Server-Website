@@ -1,5 +1,6 @@
 const fs = require('fs');
 const axios = require('axios');
+require('dotenv').config();
 const path = require('path');
 const express = require('express');
 const fileUpload = require('express-fileupload');
@@ -8,7 +9,6 @@ const propParser = require('minecraft-server-properties');
 const config = require('./config');
 const { spawn, spawnSync, execSync } = require('child_process');
 
-const prefix = '/minecraft';
 var mcserver;
 
 const app = express();
@@ -172,7 +172,7 @@ function stopServer(callback) {
 
 async function renderWebpage(res) {
   servers = await getServers();
-  res.render('index', { servers: servers, prefix: prefix });
+  res.render('index', { hostname: config.hostname, servers: servers, prefix: config.prefix });
 }
 
 app.use(fileUpload());
@@ -180,11 +180,11 @@ app.use(bodyParser.urlencoded({
   extended: true
 }));
 app.use(bodyParser.json());
-app.use(prefix, express.static('public'));
-app.use(prefix, express.static(path.join(__dirname, '/node_modules')));
+app.use(config.prefix, express.static('public'));
+app.use(config.prefix, express.static(path.join(__dirname, '/node_modules')));
 app.set('view engine', 'pug');
 
-app.post(path.join(prefix, 'upload'), (req, res) => {
+app.post(path.join(config.prefix, 'upload'), (req, res) => {
   if (!req.files || Object.keys(req.files).length === 0) {
     return res.json(createBadResponse('No files were uploaded.'));
   }
@@ -242,7 +242,7 @@ app.post(path.join(prefix, 'upload'), (req, res) => {
   });
 });
 
-app.post(path.join(prefix, 'stop'), (req, res) => {
+app.post(path.join(config.prefix, 'stop'), (req, res) => {
   if (isServerUp()) {
     stopServer(function() {
       res.json(createGoodResponse());
@@ -252,7 +252,7 @@ app.post(path.join(prefix, 'stop'), (req, res) => {
     res.json(createBadResponse("Server is not up"));
 });
 
-app.post(path.join(prefix, 'command'), (req, res) => {
+app.post(path.join(config.prefix, 'command'), (req, res) => {
   if (isServerUp()) {
     mcserver.stdin.write(req.body.command + '\n');
     res.json(createGoodResponse());
@@ -261,14 +261,14 @@ app.post(path.join(prefix, 'command'), (req, res) => {
     res.json(createBadResponse("Server not up."));
 });
 
-app.get(path.join(prefix, 'status'), (req, res) => {
+app.get(path.join(config.prefix, 'status'), (req, res) => {
   if (isServerUp())
     res.json(createGoodResponse({isUp: true, version: mcserver.version, currentMap: mcserver.currentMap}));
   else
     res.json(createGoodResponse({isUp: false}));
 });
 
-app.get(path.join(prefix, 'properties'), async (req, res) => {
+app.get(path.join(config.prefix, 'properties'), async (req, res) => {
   if (servers.includes(req.query.version)) {
     if (!fs.existsSync(path.join(config.serverDir, req.query.version)))
       await createServerFolder(req.query.version);
@@ -293,15 +293,16 @@ app.get(path.join(prefix, 'properties'), async (req, res) => {
   }
 });
 
-app.get(prefix, async (req, res) => {
+app.get(config.prefix, async (req, res) => {
   await renderWebpage(res);
 });
 
 var server = app.listen(config.port, function () {
-  console.log(`mcwebsite listening on port ${config.port}`);
+  console.log('mcwebsite successfully started with config:')
+  Object.keys(config).map(k => console.log(`\t${k}: '${config[k]}'`));
 });
 
-var io = require('socket.io')(server, { path: path.join(prefix, 'socket.io') });
+var io = require('socket.io')(server, { path: path.join(config.prefix, 'socket.io') });
 
 io.on('connection', function(client) {
   console.log('Client connected...');

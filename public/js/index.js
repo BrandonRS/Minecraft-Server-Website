@@ -8,10 +8,13 @@ const basicSettings = [
     'pvp',
     'server-port'
 ];
+
 var socket;
+var properties = {};
+var basicMode = true;
 
 $(function() {
-    socket = io.connect('https://cleft.fun', { path: `${prefix}/socket.io` });
+    socket = io.connect(hostname, { path: `${prefix}/socket.io` });
 
     socket.on('log', data => {
         $('#log').append($('<tr>').text(data));
@@ -65,11 +68,7 @@ $('#submit').click(function(e) {
     e.preventDefault();
     getServerStatus(function(res) {
         if (res.status == GOOD && !res.isUp) {
-            var properties = {};
-            $('#tbodyProp').children().each(function() {
-                var val = $(this).children('td').children('input').val();
-                properties[$(this).children('th').text()] = val === '' ? null : val;
-            });
+            saveProperties();
 
             $('#inputProp').val(JSON.stringify(properties));
             
@@ -85,6 +84,13 @@ $('#submit').click(function(e) {
 $('#version').change(function() {
     getProperties($(this).val());
 });
+
+function saveProperties() {
+    $('#tbodyProp').children().each(function() {
+        var val = $(this).children('td').children('input').val();
+        properties[$(this).children('th').text()] = val === '' ? null : val;
+    });
+}
 
 $("#stopServer").click(function() {
     $("#serverControl").find().prop("disabled", true);
@@ -149,54 +155,63 @@ function getProperties(version) {
     });
     n.show();
 
-    $('#tbodyProp').html("");
-
     $("#version").prop('disabled', 'disabled');
     $("#propertiesOverlay").show();
     $.get(`${prefix}/properties`, {'version': version})
     .done((res) => {
         n.close();
         if (res.status == GOOD) {
-            Object.keys(res.properties).sort().forEach(k => {
-                var row = $('<tr>');
-                row.append($('<th>').text(k));
-
-                var button = $('<input type="button" class="cell-button">');
-                button.val(res.properties[k] == null ? '' : res.properties[k]);
-                button.click(function() {
-                    var val = $(this).val().toLowerCase();
-                    if (val === "true" || val === "false")
-                        bootbox.prompt({
-                            title: `Enter new value for ${$(this).parent().siblings().text()}:`,
-                            inputType: 'radio',
-                            value: val,
-                            inputOptions: [
-                                {text: "True", value: "true"},
-                                {text: "False", value: "false"}
-                            ],
-                            callback: function(result) {
-                                if (result)
-                                    button.val(result);
-                            }
-                        });
-                    else
-                        bootbox.prompt({
-                            title: `Enter new value for ${$(this).parent().siblings().text()}:`,
-                            placeholder: val,
-                            callback: function(result) {
-                                if (result != null)
-                                    button.val(result);
-                            }
-                        });
-                });
-                row.append($('<td class="align-middle">').append(button));
-                $('#tbodyProp').append(row);
-            });
+            properties = res.properties;
         } else {
+            properties = {};
             showError("Failed to retrieve properties.");
         }
+        loadProperties();
         $("#propertiesOverlay").hide();
         $("#version").prop('disabled', false);
+    });
+}
+
+function loadProperties() {
+    saveProperties();
+    $('#tbodyProp').html("");
+
+    Object.keys(properties).sort().forEach(k => {
+        if (!basicMode || basicSettings.includes(k)) {
+            var row = $('<tr>');
+            row.append($('<th>').text(k));
+
+            var button = $('<input type="button" class="cell-button">');
+            button.val(properties[k] == null ? '' : properties[k]);
+            button.click(function() {
+                var val = $(this).val().toLowerCase();
+                if (val === "true" || val === "false")
+                    bootbox.prompt({
+                        title: `Enter new value for ${$(this).parent().siblings().text()}:`,
+                        inputType: 'radio',
+                        value: val,
+                        inputOptions: [
+                            {text: "True", value: "true"},
+                            {text: "False", value: "false"}
+                        ],
+                        callback: function(result) {
+                            if (result)
+                                button.val(result);
+                        }
+                    });
+                else
+                    bootbox.prompt({
+                        title: `Enter new value for ${$(this).parent().siblings().text()}:`,
+                        placeholder: val,
+                        callback: function(result) {
+                            if (result != null)
+                                button.val(result);
+                        }
+                    });
+            });
+            row.append($('<td class="align-middle">').append(button));
+            $('#tbodyProp').append(row);
+        }
     });
 }
 
