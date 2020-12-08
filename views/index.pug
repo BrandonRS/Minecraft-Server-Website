@@ -1,6 +1,7 @@
 doctype html
 html(lang="en")
   head
+    meta(charset="UTF-8")
     title MC Server
     link(
         rel="stylesheet"
@@ -24,21 +25,30 @@ html(lang="en")
                     h2#currentMapName
                     h2#currentVersion
 
-    form#startServerForm.container(action=`${prefix}/upload` method='POST' enctype="multipart/form-data")
+    form#startServerForm.container(action=`${prefix}/upload` method='POST' enctype='multipart/form-data')
         input#inputProp(type='hidden' name='properties')
         .row
             .col-4
-                label(for="version") Select Version
-                select#version.form-control(name="version")
+                label(for='version') Select Version
+                select#version.form-control(name='version')
                         - for (var i = 0; i < servers.length; i++)
                             option(value=servers[i]) #{servers[i]}
             .col-4
                 label(for='mapUpload') Upload Map
-                input#mapUpload.form-control-file(required type='file' name='mapUpload' accept='.zip')
+                input#mapUpload.form-control-file(
+                    type='file'
+                    name='mapUpload'
+                    accept='.zip'
+                )
                 .progress
                     #uploadProgress.progress-bar(role='progressbar')
             .col-4
                 h3 Edit Server Properties
+                ul#propMode.pagination.justify-content-center
+                    li#pageBasic.page-item.active
+                        button#buttonBasic.page-link(type='button') Basic
+                    li#pageAdvanced.page-item
+                        button#buttonAdvanced.page-link(type='button') Advanced
                 #tableDiv.container-fluid
                     table#tableProp.table.table-sm
                         tbody#tbodyProp
@@ -47,13 +57,13 @@ html(lang="en")
                         span.sr-only Loading...
         .row
             .col
-                input#submit(type="submit" value='Submit')
+                input#submit(type='button' value='Submit')
             .col
                 label(for='command') Send command:
                 .input-group.mb-3
                     input#command.form-control(type='text')
                     .input-group-append
-                        #sendCommand.btn.btn-outline-secondary(type="button") Send
+                        #sendCommand.btn.btn-outline-secondary(type='button') Send
     .container-fluid
         table.table
             .tbody#log
@@ -75,5 +85,5 @@ html(lang="en")
     script(src='https://cdnjs.cloudflare.com/ajax/libs/bootbox.js/5.4.0/bootbox.min.js')
     script(src=`${prefix}/socket.io-client/dist/socket.io.slim.js`)
     script
-        = `const prefix = '${prefix}';`
+        = `const prefix = '${prefix}'; const hostname = '${hostname}';`
     script(src=`${prefix}/js/index.js` type="text/javascript")

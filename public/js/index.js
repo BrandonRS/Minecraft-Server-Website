@@ -20,7 +20,7 @@ $(function() {
         $('#log').append($('<tr>').text(data));
     });
 
-    $("form").ajaxForm({
+    $("#startServerForm").ajaxForm({
         beforeSend: function() {
             $("#startServerForm").find("input").prop('disabled', true);
             $("#uploadProgress").css('width', '0%');
@@ -65,20 +65,24 @@ function showError(text) {
 }
 
 $('#submit').click(function(e) {
-    e.preventDefault();
-    getServerStatus(function(res) {
-        if (res.status == GOOD && !res.isUp) {
-            saveProperties();
-
-            $('#inputProp').val(JSON.stringify(properties));
-            
-            // Submit form
-            $('#startServerForm').submit();
-        } else {
-            $('#submit').prop('disabled', false);
-            showError("Failed to start server: Server already running.");
-        }
-    });
+    // Make sure file is selected
+    if ($("#mapUpload").val().length > 0) {
+        getServerStatus(function(res) {
+            if (res.status == GOOD && !res.isUp) {
+                saveProperties();
+    
+                $('#inputProp').val(JSON.stringify(properties));
+                
+                // Submit form
+                $('#startServerForm').submit();
+            } else {
+                $('#submit').prop('disabled', false);
+                showError("Failed to start server: Server already running.");
+            }
+        });
+    } else {
+        showError("Error: Please select file to upload.");
+    }
 });
 
 $('#version').change(function() {
@@ -93,7 +97,7 @@ function saveProperties() {
 }
 
 $("#stopServer").click(function() {
-    $("#serverControl").find().prop("disabled", true);
+    $("#serverControl").find('input').prop("disabled", true);
     $.post(`${prefix}/stop`)
     .done(function(res) {
         $("#serverControl").find().prop("disabled", false);
@@ -214,6 +218,25 @@ function loadProperties() {
         }
     });
 }
+
+$("#buttonBasic").click(() => {
+    if (!basicMode) {
+        $('#pageBasic').toggleClass('active');
+        $('#pageAdvanced').toggleClass('active');
+        basicMode = true;
+        loadProperties();
+    }
+    $('.pagination').blur();
+});
+
+$('#buttonAdvanced').click(() => {
+    if (basicMode) {
+        $('#pageBasic').toggleClass('active');
+        $('#pageAdvanced').toggleClass('active');
+        basicMode = false;
+        loadProperties();
+    }
+});
 
 $("#checkStatus").click(function() {
     getServerStatus();
