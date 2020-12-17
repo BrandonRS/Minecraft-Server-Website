@@ -67,13 +67,29 @@ function showError(text) {
 $('#submit').click(function(e) {
     // Make sure file is selected
     if ($("#mapUpload").val().length > 0) {
-        getServerStatus(function(res) {
+        getServerStatus((res) => {
             if (res.status == GOOD && !res.isUp) {
                 saveProperties();
     
                 $('#inputProp').val(JSON.stringify(properties));
                 
                 // Submit form
+                $('#startServerForm').prop('action', `${prefix}/upload`);
+                $('#startServerForm').submit();
+            } else {
+                $('#submit').prop('disabled', false);
+                showError("Failed to start server: Server already running.");
+            }
+        });
+    } else if ($("#mapLink").val().length > 0) {
+        getServerStatus((res) => {
+            if (res.status == GOOD && !res.isUp) {
+                saveProperties();
+    
+                $('#inputProp').val(JSON.stringify(properties));
+                
+                // Submit form
+                $('#startServerForm').prop('action', `${prefix}/uploadlink`);
                 $('#startServerForm').submit();
             } else {
                 $('#submit').prop('disabled', false);

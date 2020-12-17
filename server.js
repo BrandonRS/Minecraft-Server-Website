@@ -42,10 +42,14 @@ async function getServers() {
 
 function replaceMapForVersion(version, newMapDir) {
   let versionDir = path.join(config.serverDir, version)
-  var result = spawnSync('rm', ['-rf', path.join(versionDir, 'world*')]);
+  var result = spawnSync('rm', ['-rf', path.join(versionDir, 'world')]);
   if (result.status == 0) {
-    spawnSync('cp', ['-r', newMapDir, path.join(versionDir, 'world')]);
+    result = spawnSync('cp', ['-r', newMapDir, path.join(versionDir, 'world')]);
+
+    return result.status == 0;
   }
+
+  return false;
 }
 
 async function downloadServerJar(version) {
@@ -175,6 +179,12 @@ async function renderWebpage(res) {
   res.render('index', { hostname: config.hostname, servers: servers, prefix: config.prefix });
 }
 
+function getMapFromLink(link, filepath) {
+  var result = spawnSync("wget", [link, '-O', filepath]);
+
+  return result.status == 0;
+}
+
 app.use(fileUpload());
 app.use(bodyParser.urlencoded({
   extended: true
@@ -183,6 +193,63 @@ app.use(bodyParser.json());
 app.use(config.prefix, express.static('public'));
 app.use(config.prefix, express.static(path.join(__dirname, '/node_modules')));
 app.set('view engine', 'pug');
+
+app.post(path.join(config.prefix, 'uploadlink'), (req, res) => {
+  if (isServerUp())
+    return res.json(createBadResponse("Server currently running."));
+
+  // The name of the input field (i.e. "sampleFile") is used to retrieve the uploaded file
+  let version = req.body.version;
+  let mapName = 'map.zip';
+  let zipPath = path.join(config.tempDir, mapName);
+
+  // Verify version
+  if (!servers.includes(version)) {
+    return res.json(createBadResponse("Version not valid"));
+  }
+
+  // Get file from link
+  if (!getMapFromLink(req.body.filelink, zipPath))
+    return res.json(createBadResponse("Failed to get map from link"));
+
+  var extractedFolderPath = path.join(config.tempDir, mapName.substring(0, mapName.length - 4));
+  var unzipResult = spawnSync('unzip', ['-o', '-d', extractedFolderPath, zipPath]);
+  if (unzipResult.status == 0) {
+    var mapDirectories = spawnSync('find', [extractedFolderPath, '-iname', 'level.dat'], {encoding: 'utf-8'}).stdout.trimRight().split('\n');
+    var mapDirectory = mapDirectories[0];
+
+    if (mapDirectory.length > 0) {
+      // Remove 'level.dat' from end of path
+      mapDirectory = mapDirectory.substring(0, mapDirectory.length - 9);
+
+      if (!replaceMapForVersion(version, mapDirectory)) {
+        spawnSync('rm', ['-rf', extractedFolderPath]);
+        return res.json(createBadResponse(`Failed to place map for version ${version}`));
+      }
+
+      var propertiesPath = path.join(config.serverDir, version, 'server.properties');
+      fs.writeFileSync(propertiesPath, propParser.stringify(JSON.parse(req.body.properties)));
+
+      startServer(version);
+    } else {
+      console.log("Map dir length not greater than 0");
+    }
+
+    spawnSync('rm', ['-rf', extractedFolderPath]);
+  } else {
+    console.log("Failed to unzip");
+  }
+  spawnSync('rm', ['-rf', zipPath]);
+
+  if (isServerUp()) {
+    console.log(`Server launched!\tVersion: ${version}\tMap name: Zip file`)
+    mcserver.currentMap = "Zip file";
+    mcserver.version = version;
+    res.json(createGoodResponse());
+  } else {
+    res.json(createBadResponse("Server failed to start. Check the log."));
+  }
+});
 
 app.post(path.join(config.prefix, 'upload'), (req, res) => {
   if (!req.files || Object.keys(req.files).length === 0) {

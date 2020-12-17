@@ -25,7 +25,7 @@ html(lang="en")
                     h2#currentMapName
                     h2#currentVersion
 
-    form#startServerForm.container(action=`${prefix}/upload` method='POST' enctype='multipart/form-data')
+    form#startServerForm.container(method='POST' enctype='multipart/form-data')
         input#inputProp(type='hidden' name='properties')
         .row
             .col-4
@@ -42,6 +42,13 @@ html(lang="en")
                 )
                 .progress
                     #uploadProgress.progress-bar(role='progressbar')
+                br
+                b or
+                br
+                br
+                label(for='mapLink') Paste a link
+                br
+                input#mapLink(name='filelink' type='text' placeholder='Link here...')
             .col-4
                 h3 Edit Server Properties
                 ul#propMode.pagination.justify-content-center

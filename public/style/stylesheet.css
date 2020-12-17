@@ -39,3 +39,7 @@ body {
     top: 45%;
     left: 45%;
 }
+
+#mapLink {
+    width: 100%;
+}
