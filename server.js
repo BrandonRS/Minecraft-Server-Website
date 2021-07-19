@@ -4,7 +4,6 @@ require('dotenv').config();
 const path = require('path');
 const express = require('express');
 const fileUpload = require('express-fileupload');
-const bodyParser = require('body-parser');
 const propParser = require('minecraft-server-properties');
 const config = require('./config');
 const { spawn, spawnSync, execSync } = require('child_process');
@@ -181,10 +180,10 @@ function getMapFromLink(link, filepath) {
 }
 
 app.use(fileUpload());
-app.use(bodyParser.urlencoded({
+app.use(express.urlencoded({
   extended: true
 }));
-app.use(bodyParser.json());
+app.use(express.json());
 app.use(config.prefix, express.static('public'));
 app.use(config.prefix, express.static(path.join(__dirname, '/node_modules')));
 app.set('view engine', 'pug');
