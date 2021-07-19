@@ -86,9 +86,11 @@ async function createServerFolder(version) {
 
   fs.mkdirSync(versionFolderPath);
 
+  console.log(`Downloading server jar for version ${version}...`);
   var success = await downloadServerJar(version);
 
   if (success) {
+    console.log(`Successfully downloaded server jar for version ${version}.`);
     spawnSync('java', ['-jar', jarPath], { encoding: 'utf-8', cwd: versionFolderPath });
 
     if (!fs.existsSync(path.join(versionFolderPath, 'eula.txt')))
@@ -109,19 +111,12 @@ function loadProperties(version) {
   var tempServer = spawn('java', args, { cwd: versionFolder });
 
   if (tempServer) {
-    var found = false;
-
-    tempServer.stdout.setEncoding('utf-8');
-    tempServer.stdout.on('data', data => {
-      found =  data.includes("Default game");
-    });
-
     return new Promise(async resolve => {
-      while (!found && tempServer.exitCode == null) {
+      while (tempServer.exitCode == null) {
         await new Promise(resolve => setTimeout(resolve, 50));
       }
 
-      resolve(found);
+      resolve(fs.existsSync(path.join(versionFolder, 'server.properties')));
     });
   }
 
@@ -343,10 +338,15 @@ app.get(path.join(config.prefix, 'properties'), async (req, res) => {
     var propertiesPath = path.join(config.serverDir, req.query.version, 'server.properties');
 
     if (!fs.existsSync(propertiesPath) || linesInFile(propertiesPath) < 5) {
+      console.log(`Incomplete properties file for ${req.query.version}. Loading properties...`);
       var result = await loadProperties(req.query.version);
 
-      if (!result)
+      if (!result) {
+        console.log("Failed to load properties.")
         return res.json(createBadResponse("Failed to load properties."));
+      }
+
+        console.log(`Successfully loaded properties for ${req.query.version}.`);
     }
 
     fs.readFile(propertiesPath, {encoding: 'utf-8'}, function(err, data) {
